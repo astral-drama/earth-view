@@ -1,0 +1,8 @@
+name: earth-view
+prefix: eavir
+description: WebGL Earth simulator and viewer running in a webpage
+git_url: ''
+maintainers:
+- seth@example.com
+created_at: null
+version: '1.0'
