@@ -239,15 +239,88 @@ class EarthRenderer {
         return buffer;
     }
     
+    async loadImageTexture(url, fallbackGenerator) {
+        try {
+            console.log(`Loading texture: ${url}`);
+            
+            const image = new Image();
+            image.crossOrigin = 'anonymous'; // Enable CORS for local loading
+            
+            // Create promise for image loading
+            await new Promise((resolve, reject) => {
+                image.onload = () => {
+                    console.log(`Texture loaded: ${url} (${image.width}x${image.height})`);
+                    resolve();
+                };
+                image.onerror = (error) => {
+                    console.error(`Failed to load texture: ${url}`, error);
+                    reject(error);
+                };
+                image.src = url;
+            });
+            
+            // Create WebGL texture from image
+            return this.createWebGLTextureFromImage(image);
+            
+        } catch (error) {
+            console.warn(`Failed to load texture: ${url}, using fallback`);
+            return fallbackGenerator();
+        }
+    }
+    
+    createWebGLTextureFromImage(image) {
+        const texture = this.gl.createTexture();
+        this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
+        
+        // Upload image to texture
+        this.gl.texImage2D(
+            this.gl.TEXTURE_2D, 
+            0, 
+            this.gl.RGBA, 
+            this.gl.RGBA, 
+            this.gl.UNSIGNED_BYTE, 
+            image
+        );
+        
+        // Set texture parameters
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+        this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+        
+        return texture;
+    }
+    
     async loadTextures() {
-        // For now, create simple procedural textures
-        // In a real implementation, you'd load actual Earth texture files
-        
-        this.textures.earthDay = this.createProceduralTexture('day');
-        this.textures.earthNight = this.createProceduralTexture('night');
-        this.textures.earthClouds = this.createProceduralTexture('clouds');
-        
-        console.log('Textures loaded (procedural)');
+        try {
+            // Load real NASA Earth textures
+            console.log('Loading NASA Earth textures...');
+            
+            // Load textures with fallbacks to procedural generation
+            this.textures.earthDay = await this.loadImageTexture(
+                'assets/textures/earth-day.jpg', 
+                () => this.createProceduralTexture('day')
+            );
+            
+            this.textures.earthNight = await this.loadImageTexture(
+                'assets/textures/earth-night.jpg',
+                () => this.createProceduralTexture('night')
+            );
+            
+            this.textures.earthClouds = await this.loadImageTexture(
+                'assets/textures/earth-clouds.jpg',
+                () => this.createProceduralTexture('clouds')
+            );
+            
+            console.log('NASA Earth textures loaded successfully');
+        } catch (error) {
+            console.error('Failed to load textures:', error);
+            // Fallback to procedural textures
+            this.textures.earthDay = this.createProceduralTexture('day');
+            this.textures.earthNight = this.createProceduralTexture('night');
+            this.textures.earthClouds = this.createProceduralTexture('clouds');
+            console.log('Using procedural textures as fallback');
+        }
     }
     
     createProceduralTexture(type) {

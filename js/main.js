@@ -31,6 +31,9 @@ class EarthViewApp {
             const aspectRatio = this.canvas.clientWidth / this.canvas.clientHeight;
             this.earthRenderer.aspectRatio = aspectRatio;
             
+            // Update loading message
+            document.getElementById('loading').innerHTML = 'Loading NASA Earth textures...';
+            
             await this.earthRenderer.init();
             
             // Hide loading screen
