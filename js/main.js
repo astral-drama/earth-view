@@ -26,6 +26,11 @@ class EarthViewApp {
             
             // Initialize Earth renderer
             this.earthRenderer = new EarthRenderer(this.gl);
+            
+            // Set correct aspect ratio before initialization
+            const aspectRatio = this.canvas.clientWidth / this.canvas.clientHeight;
+            this.earthRenderer.aspectRatio = aspectRatio;
+            
             await this.earthRenderer.init();
             
             // Hide loading screen

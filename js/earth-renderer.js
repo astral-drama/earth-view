@@ -52,6 +52,9 @@ class EarthRenderer {
             await this.loadTextures();
             this.setupUniforms();
             
+            // Initialize projection matrix
+            this.updateProjection(this.aspectRatio);
+            
             console.log('Earth renderer initialized successfully');
         } catch (error) {
             console.error('Failed to initialize Earth renderer:', error);
