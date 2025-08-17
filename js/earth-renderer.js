@@ -200,7 +200,8 @@ class EarthRenderer {
                 
                 vertices.push(radius * x, radius * y, radius * z);
                 normals.push(x, y, z);
-                texCoords.push(lon / lonBands, lat / latBands);
+                // Fix texture coordinate mapping - flip U coordinate horizontally
+                texCoords.push(1.0 - (lon / lonBands), lat / latBands);
             }
         }
         
