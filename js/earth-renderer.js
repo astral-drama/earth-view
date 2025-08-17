@@ -204,14 +204,15 @@ class EarthRenderer {
             }
         }
         
-        // Generate indices
+        // Generate indices (corrected winding order for outward-facing triangles)
         for (let lat = 0; lat < latBands; lat++) {
             for (let lon = 0; lon < lonBands; lon++) {
                 const first = lat * (lonBands + 1) + lon;
                 const second = first + lonBands + 1;
                 
-                indices.push(first, second, first + 1);
-                indices.push(second, second + 1, first + 1);
+                // Counter-clockwise winding for outward-facing triangles
+                indices.push(first, first + 1, second);
+                indices.push(second, first + 1, second + 1);
             }
         }
         
