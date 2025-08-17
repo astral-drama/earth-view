@@ -191,12 +191,46 @@ class EarthViewApp {
             }
         });
         
+        // Cloud opacity control
+        const cloudOpacity = document.getElementById('cloudOpacity');
+        const cloudOpacityValue = document.getElementById('cloudOpacityValue');
+        
+        cloudOpacity.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            cloudOpacityValue.textContent = Math.round(value * 100) + '%';
+            if (this.earthRenderer) {
+                this.earthRenderer.setCloudOpacity(value);
+            }
+        });
+        
+        // Auto rotate toggle
+        const autoRotate = document.getElementById('autoRotate');
+        autoRotate.addEventListener('change', (e) => {
+            if (this.earthRenderer) {
+                this.earthRenderer.setAutoRotate(e.target.checked);
+            }
+        });
+        
+        // Grid overlay toggle
+        const showGrid = document.getElementById('showGrid');
+        showGrid.addEventListener('change', (e) => {
+            if (this.earthRenderer) {
+                this.earthRenderer.setGridVisible(e.target.checked);
+            }
+        });
+        
+        // Real-time UTC clock display
+        this.updateUtcClock();
+        
         this.controls = {
             rotationSpeed,
             zoomLevel,
             showAtmosphere,
             showClouds,
-            nightLights
+            nightLights,
+            cloudOpacity,
+            autoRotate,
+            showGrid
         };
     }
     
@@ -206,6 +240,28 @@ class EarthViewApp {
             this.controls.zoomLevel.value = currentZoom;
             document.getElementById('zoomLevelValue').textContent = currentZoom.toFixed(1);
         }
+    }
+    
+    updateUtcClock() {
+        const updateTime = () => {
+            const now = new Date();
+            const utcTimeStr = now.toUTCString().slice(17, 25); // Extract HH:MM:SS
+            const utcDateStr = now.toUTCString().slice(0, 16); // Extract date part
+            
+            const utcElement = document.getElementById('currentUtcTime');
+            const dateElement = document.getElementById('currentDate');
+            
+            if (utcElement) {
+                utcElement.textContent = utcTimeStr;
+            }
+            if (dateElement) {
+                dateElement.textContent = utcDateStr;
+            }
+        };
+        
+        // Update immediately and then every second
+        updateTime();
+        setInterval(updateTime, 1000);
     }
     
     startRenderLoop() {

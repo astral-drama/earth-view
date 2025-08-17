@@ -49,6 +49,31 @@
             width: 100%;
         }
         
+        .control-group input[type="time"] {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid #555;
+            border-radius: 4px;
+            padding: 4px;
+        }
+        
+        .control-group button {
+            width: 100%;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 6px;
+            cursor: pointer;
+            margin-top: 5px;
+            font-size: 12px;
+        }
+        
+        .control-group button:hover {
+            background: #45a049;
+        }
+        
         .info {
             position: absolute;
             bottom: 20px;
@@ -108,10 +133,40 @@
         </div>
         
         <div class="control-group">
+            <label for="cloudOpacity">Cloud Opacity</label>
+            <input type="range" id="cloudOpacity" min="0" max="1" step="0.1" value="0.2">
+            <span id="cloudOpacityValue">20%</span>
+        </div>
+        
+        <div class="control-group">
+            <label>
+                <input type="checkbox" id="autoRotate"> 
+                Auto Rotate Earth
+            </label>
+        </div>
+        
+        <div class="control-group">
+            <label>
+                <input type="checkbox" id="showGrid"> 
+                Coordinate Grid
+            </label>
+        </div>
+        
+        <div class="control-group">
             <label>
                 <input type="checkbox" id="nightLights" checked> 
                 Night City Lights
             </label>
+        </div>
+        
+        <div class="control-group">
+            <label>Current UTC Time</label>
+            <span id="currentUtcTime">--:--:--</span>
+        </div>
+        
+        <div class="control-group">
+            <label>Current Date</label>
+            <span id="currentDate">----</span>
         </div>
     </div>
     

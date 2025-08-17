@@ -1,24 +1,28 @@
-# Story: eavir-5 - Satellite and ISS Tracking
+# Story: eavir-5 - Time Server Network Overlay
 
 ## Overview
-Add real-time satellite tracking overlay showing International Space Station, major satellites, and orbital paths.
+Add real-time time server visualization showing NTP/PTP server locations, network latency patterns, and time synchronization accuracy across the globe.
 
 ## Acceptance Criteria
-- [ ] ISS real-time position and orbital path
-- [ ] Major satellite constellation tracking (Starlink, GPS, etc.)
-- [ ] Orbital mechanics visualization
-- [ ] Ground track projections
-- [ ] Satellite info panels on hover/click
-- [ ] Toggle satellite categories on/off
+- [ ] Time server location markers (NTP, PTP, GPS-disciplined)
+- [ ] Real-time ping/latency visualization with color coding
+- [ ] Time drift analysis and accuracy indicators
+- [ ] Network topology connections between servers
+- [ ] Server information panels (stratum, accuracy, location)
+- [ ] Time zone correlation with server positions
+- [ ] Historical time drift trend overlays
 
 ## Technical Details
-- TLE (Two-Line Element) data integration
-- SGP4/SDP4 orbital propagation algorithms
-- Real-time satellite position APIs
-- 3D orbital path rendering
-- Ground station visibility calculations
+- NTP server discovery and polling
+- WebSocket connections for real-time updates
+- Latency visualization with animated pulses
+- Time drift calculation and trending
+- Geographic coordinate mapping for servers
+- Interactive server selection and detailed metrics
 
 ## Data Sources
-- NASA TLE data
-- CelesTrak satellite database
-- Space-Track.org API
+- NTP pool project server lists
+- Public NTP server databases
+- Real-time ping measurements
+- Time synchronization accuracy data
+- Geographic IP location services

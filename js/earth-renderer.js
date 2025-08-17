@@ -23,15 +23,33 @@ class EarthRenderer {
         // Earth state
         this.earth = {
             rotation: [0, 0],
-            rotationSpeed: 0.5,
+            rotationSpeed: 1.0, // Real-time rotation rate
+            autoRotate: true, // Always use real-time rotation
             scale: 1.0
+        };
+        
+        // Sun/lighting state
+        this.sun = {
+            direction: [0.5, 0.5, 0.5], // Default direction
+            intensity: 1.0
+        };
+        
+        // Time control state - always use current real time
+        this.timeControl = {
+            useManualTime: false, // Always use real time
+            manualTime: '12:00',
+            timeSpeed: 1.0,
+            startTime: Date.now()
         };
         
         // Feature toggles
         this.features = {
             atmosphere: true,
             clouds: true,
-            nightLights: true
+            nightLights: true,
+            cloudOpacity: 0.2, // Reduced default for time server visibility
+            gridOverlay: false,
+            timezones: false
         };
         
         // Matrices
@@ -102,6 +120,8 @@ class EarthRenderer {
             uniform bool u_showAtmosphere;
             uniform bool u_showClouds;
             uniform bool u_showNightLights;
+            uniform float u_cloudOpacity;
+            uniform bool u_showGrid;
             
             varying vec2 v_texCoord;
             varying vec3 v_normal;
@@ -121,20 +141,49 @@ class EarthRenderer {
                     v_lightIntensity
                 );
                 
-                // Add clouds
+                // Add clouds with configurable opacity
                 if (u_showClouds) {
                     // Animate clouds slightly
                     vec2 cloudCoord = v_texCoord + vec2(u_time * 0.00001, 0.0);
                     vec4 animatedClouds = texture2D(u_earthClouds, cloudCoord);
-                    earthColor = mix(earthColor, vec3(1.0), animatedClouds.a * 0.7);
+                    // Mix with cloud color using configurable opacity
+                    vec3 cloudColor = vec3(0.9, 0.95, 1.0); // Slightly off-white clouds
+                    earthColor = mix(earthColor, cloudColor, animatedClouds.a * u_cloudOpacity);
                 }
                 
-                // Simple atmosphere effect
+                // More subtle atmosphere effect
                 if (u_showAtmosphere) {
                     vec3 viewDir = normalize(v_worldPos);
                     float fresnel = 1.0 - abs(dot(viewDir, v_normal));
-                    vec3 atmosphereColor = vec3(0.3, 0.6, 1.0) * fresnel * 0.3;
+                    // More subtle blue atmosphere, less washing out
+                    vec3 atmosphereColor = vec3(0.4, 0.7, 1.0) * fresnel * 0.15;
                     earthColor += atmosphereColor;
+                }
+                
+                // Add coordinate grid overlay
+                if (u_showGrid) {
+                    // Convert texture coordinates to lat/lon grid
+                    float lat = (v_texCoord.y - 0.5) * 180.0; // -90 to +90 degrees
+                    float lon = (v_texCoord.x - 0.5) * 360.0; // -180 to +180 degrees
+                    
+                    // Create grid lines every 15 degrees
+                    float latGrid = abs(mod(lat + 7.5, 15.0) - 7.5);
+                    float lonGrid = abs(mod(lon + 7.5, 15.0) - 7.5);
+                    
+                    // Make grid lines thinner and more subtle
+                    float gridLine = 0.0;
+                    if (latGrid < 0.5 || lonGrid < 0.5) {
+                        gridLine = 0.3;
+                    }
+                    
+                    // Special highlighting for major lines (equator, prime meridian)
+                    if (abs(lat) < 0.5 || abs(lon) < 0.5) {
+                        gridLine = 0.5; // Brighter for major reference lines
+                    }
+                    
+                    // Blend grid with earth color
+                    vec3 gridColor = vec3(0.8, 0.9, 1.0); // Light blue grid
+                    earthColor = mix(earthColor, gridColor, gridLine * 0.4);
                 }
                 
                 gl_FragColor = vec4(earthColor, 1.0);
@@ -410,7 +459,9 @@ class EarthRenderer {
             earthClouds: this.gl.getUniformLocation(this.shaderProgram, 'u_earthClouds'),
             showAtmosphere: this.gl.getUniformLocation(this.shaderProgram, 'u_showAtmosphere'),
             showClouds: this.gl.getUniformLocation(this.shaderProgram, 'u_showClouds'),
-            showNightLights: this.gl.getUniformLocation(this.shaderProgram, 'u_showNightLights')
+            showNightLights: this.gl.getUniformLocation(this.shaderProgram, 'u_showNightLights'),
+            cloudOpacity: this.gl.getUniformLocation(this.shaderProgram, 'u_cloudOpacity'),
+            showGrid: this.gl.getUniformLocation(this.shaderProgram, 'u_showGrid')
         };
         
         this.attributes = {
@@ -421,8 +472,16 @@ class EarthRenderer {
     }
     
     render(time) {
-        // Update Earth rotation
-        this.earth.rotation[1] += this.earth.rotationSpeed * 0.01;
+        // Update Earth rotation at realistic rate (24 hours per full rotation)
+        if (this.earth.autoRotate) {
+            // Real-time rotation: 360 degrees per 24 hours = 15 degrees per hour = 0.25 degrees per minute
+            // At 60 FPS: 0.25 degrees / (60 * 60 frames) = 0.0000694 degrees per frame
+            const realTimeRotationSpeed = (2 * Math.PI) / (24 * 60 * 60 * 60); // radians per frame at 60fps
+            this.earth.rotation[1] += realTimeRotationSpeed * this.earth.rotationSpeed;
+        }
+        
+        // Update sun position for realistic lighting
+        this.updateSunPosition(time);
         
         // Update matrices
         this.updateMatrices();
@@ -434,11 +493,14 @@ class EarthRenderer {
         this.gl.uniformMatrix4fv(this.uniforms.mvpMatrix, false, this.matrices.mvp);
         this.gl.uniformMatrix4fv(this.uniforms.modelMatrix, false, this.matrices.model);
         this.gl.uniformMatrix4fv(this.uniforms.normalMatrix, false, this.matrices.model);
-        this.gl.uniform3fv(this.uniforms.lightDirection, [0.5, 0.5, 0.5]);
+        // Use dynamic sun direction instead of fixed lighting
+        this.gl.uniform3fv(this.uniforms.lightDirection, this.sun.direction);
         this.gl.uniform1f(this.uniforms.time, time);
         this.gl.uniform1i(this.uniforms.showAtmosphere, this.features.atmosphere);
         this.gl.uniform1i(this.uniforms.showClouds, this.features.clouds);
         this.gl.uniform1i(this.uniforms.showNightLights, this.features.nightLights);
+        this.gl.uniform1f(this.uniforms.cloudOpacity, this.features.cloudOpacity);
+        this.gl.uniform1i(this.uniforms.showGrid, this.features.gridOverlay);
         
         // Bind textures
         this.gl.activeTexture(this.gl.TEXTURE0);
@@ -512,6 +574,14 @@ class EarthRenderer {
         this.earth.rotationSpeed = speed;
     }
     
+    setAutoRotate(enabled) {
+        this.earth.autoRotate = enabled;
+    }
+    
+    getAutoRotate() {
+        return this.earth.autoRotate;
+    }
+    
     setZoom(zoom) {
         this.camera.zoom = zoom;
     }
@@ -530,5 +600,96 @@ class EarthRenderer {
     
     setNightLightsVisible(visible) {
         this.features.nightLights = visible;
+    }
+    
+    setCloudOpacity(opacity) {
+        this.features.cloudOpacity = Math.max(0, Math.min(1, opacity));
+    }
+    
+    getCloudOpacity() {
+        return this.features.cloudOpacity;
+    }
+    
+    setGridVisible(visible) {
+        this.features.gridOverlay = visible;
+    }
+    
+    getGridVisible() {
+        return this.features.gridOverlay;
+    }
+    
+    setManualTime(timeString) {
+        this.timeControl.useManualTime = true;
+        this.timeControl.manualTime = timeString;
+        this.timeControl.startTime = Date.now();
+    }
+    
+    setTimeSpeed(speed) {
+        this.timeControl.timeSpeed = speed;
+        this.timeControl.startTime = Date.now();
+    }
+    
+    useRealtimeMode() {
+        this.timeControl.useManualTime = false;
+    }
+    
+    updateSunPosition(time) {
+        // Always use current real UTC time for accurate lighting
+        const now = new Date();
+        const utcHours = now.getUTCHours();
+        const utcMinutes = now.getUTCMinutes();
+        const utcSeconds = now.getUTCSeconds();
+        
+        // Calculate day of year for seasonal variation
+        const start = new Date(now.getFullYear(), 0, 0);
+        const diff = now - start;
+        const dayOfYear = Math.floor(diff / (1000 * 60 * 60 * 24));
+        
+        // Calculate solar declination (sun's latitude) based on day of year
+        // Varies from +23.5° (summer solstice ~June 21, day 172) to -23.5° (winter solstice ~Dec 21, day 355)
+        // August 17 (day 228) should have positive declination (Northern Hemisphere summer)
+        const declination = -23.45 * Math.sin((360 * (284 + dayOfYear) / 365) * Math.PI / 180) * Math.PI / 180;
+        
+        // Convert to decimal hours (0-24)
+        const hours = utcHours + (utcMinutes / 60) + (utcSeconds / 3600);
+        
+        // Calculate sun's longitude (hour angle)
+        // 12:00 UTC = sun over Greenwich meridian (0°)
+        // Sun moves 15° per hour westward (so at 03:24 UTC, sun is at ~130°E)
+        const sunLongitude = ((hours - 12) * 15) * (Math.PI / 180);
+        
+        // Create realistic sun direction vector using spherical coordinates
+        // Convert from solar coordinates to Cartesian coordinates
+        this.sun.direction = [
+            Math.cos(declination) * Math.cos(sunLongitude), // X: East-West
+            Math.sin(declination), // Y: North-South (seasonal tilt)
+            Math.cos(declination) * Math.sin(sunLongitude)  // Z: Up-Down
+        ];
+        
+        // Normalize the direction vector
+        const length = Math.sqrt(
+            this.sun.direction[0] * this.sun.direction[0] +
+            this.sun.direction[1] * this.sun.direction[1] +
+            this.sun.direction[2] * this.sun.direction[2]
+        );
+        
+        if (length > 0) {
+            this.sun.direction[0] /= length;
+            this.sun.direction[1] /= length;
+            this.sun.direction[2] /= length;
+        }
+        
+        // Sun intensity remains constant
+        this.sun.intensity = 1.0;
+        
+        // Debug logging (remove in production)
+        if (Math.floor(time / 1000) % 30 === 0) { // Log every 30 seconds
+            console.log(`Sun Position Debug:
+                UTC Time: ${hours.toFixed(2)} hours
+                Day of Year: ${dayOfYear}
+                Declination: ${(declination * 180 / Math.PI).toFixed(2)}°
+                Sun Longitude: ${(sunLongitude * 180 / Math.PI).toFixed(2)}°
+                Sun Direction: [${this.sun.direction.map(x => x.toFixed(3)).join(', ')}]`);
+        }
     }
 }
