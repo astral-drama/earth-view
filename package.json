@@ -1,0 +1,42 @@
+{
+  "name": "earth-view",
+  "version": "1.0.0",
+  "description": "WebGL Earth simulator and viewer running in a webpage",
+  "main": "index.html",
+  "scripts": {
+    "serve": "python3 -m http.server 8000",
+    "serve-node": "npx serve .",
+    "dev": "npm run serve",
+    "build": "echo 'No build process needed - vanilla JS/WebGL project'",
+    "lint": "echo 'Add linting configuration as needed'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lakowske/earth-view.git"
+  },
+  "keywords": [
+    "webgl",
+    "earth",
+    "3d",
+    "visualization",
+    "simulator",
+    "globe",
+    "planet",
+    "graphics",
+    "javascript"
+  ],
+  "author": "seth@example.com",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/lakowske/earth-view/issues"
+  },
+  "homepage": "https://lakowske.github.io/earth-view/",
+  "devDependencies": {},
+  "dependencies": {},
+  "browserslist": [
+    "Chrome >= 56",
+    "Firefox >= 51",
+    "Safari >= 10",
+    "Edge >= 79"
+  ]
+}

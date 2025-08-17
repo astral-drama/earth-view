@@ -1,7 +1,7 @@
 name: earth-view
 prefix: eavir
 description: WebGL Earth simulator and viewer running in a webpage
-git_url: ''
+git_url: https://github.com/lakowske/earth-view.git
 maintainers:
 - seth@example.com
 created_at: null

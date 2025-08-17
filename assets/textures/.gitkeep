@@ -1,0 +1,6 @@
+# Texture assets directory
+# Add your Earth texture files here:
+# - earth-day.jpg (color map of Earth's surface)
+# - earth-night.jpg (city lights/night view)
+# - earth-clouds.jpg (cloud cover with alpha channel)
+# - earth-bump.jpg (height/normal map for surface detail)
