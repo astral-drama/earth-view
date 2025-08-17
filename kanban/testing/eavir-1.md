@@ -52,6 +52,16 @@ Implement the foundation WebGL Earth renderer with basic sphere geometry, proced
 - Comprehensive error handling and logging
 - Performance monitoring with FPS counter
 
+## Key Implementation Guidance
+
+**Projection Matrix**: Initialize projection matrix immediately in the renderer init() method, not just on resize. Without proper initialization, nothing will render even if all other components are correct.
+
+**Triangle Winding Order**: Generate sphere indices with counter-clockwise winding for outward-facing triangles. The pattern should be: first vertex, first+1, second vertex, then second, first+1, second+1. Incorrect winding makes the Earth appear inside-out.
+
+**UV Texture Coordinates**: Flip the U coordinate horizontally by using (1.0 - longitude/lonBands) to prevent mirrored geography. Standard UV mapping will show continents reversed.
+
+**WebGL State**: Enable depth testing and backface culling early in setup. Set the cull face to BACK to hide interior triangles.
+
 ## Definition of Done
 - [x] Earth renders correctly in all major browsers
 - [x] Interactive controls work smoothly

@@ -63,23 +63,10 @@ Replace procedural textures with high-resolution NASA Earth texture maps to disp
 ## Implementation Plan
 
 ### Phase 1: Basic Image Loading
-```javascript
-async loadImageTexture(url, fallbackGenerator) {
-    try {
-        const image = new Image();
-        image.crossOrigin = 'anonymous';
-        await new Promise((resolve, reject) => {
-            image.onload = resolve;
-            image.onerror = reject;
-            image.src = url;
-        });
-        return this.createWebGLTexture(image);
-    } catch (error) {
-        console.warn(`Failed to load texture: ${url}, using fallback`);
-        return fallbackGenerator();
-    }
-}
-```
+- Create async image loading with CORS support
+- Implement fallback to procedural textures on load failure
+- Set proper WebGL texture parameters for filtering and wrapping
+- Handle different texture resolutions gracefully
 
 ### Phase 2: Progress Loading
 - Add loading bar for each texture
@@ -90,6 +77,16 @@ async loadImageTexture(url, fallbackGenerator) {
 - Add overlay with country borders for validation
 - Test UV mapping by identifying known landmarks
 - Verify night lights match major population centers
+
+## Critical Implementation Details
+
+**CORS and Local Files**: When loading textures locally, use an HTTP server instead of file:// protocol. Browser security prevents loading images from file:// URLs even with crossOrigin set.
+
+**Texture Coordinate Verification**: NASA textures follow standard equirectangular projection. Ensure UV coordinates span 0-1 with proper hemisphere alignment. Verify Africa appears in center, Americas on left, Asia on right.
+
+**Multiple Resolution Support**: Prepare for different texture sizes. Night texture may be different resolution than day texture. Use LINEAR filtering for smooth scaling.
+
+**Loading Order**: Load all textures in parallel but ensure procedural fallbacks are ready first. This prevents blank Earth if network loading fails.
 
 ## Definition of Done
 - [x] Earth displays accurate continents and oceans
