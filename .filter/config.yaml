@@ -1,0 +1,4 @@
+kanban_directory: .filter/kanban
+git:
+  auto_commit_stories: true
+  branch_naming: eavir-{story_number}
