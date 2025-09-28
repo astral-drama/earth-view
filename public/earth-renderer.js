@@ -13,6 +13,11 @@ class EarthRenderer {
         this.nightTexture = null;
         this.cloudTexture = null;
 
+        // Texture loading state
+        this.texturesLoaded = false;
+        this.loadingProgress = { day: 0, night: 0, clouds: 0 };
+        this.useProceduralFallback = false;
+
         // Use glMatrix API
         this.mat4 = glMatrix.mat4;
         this.mat3 = glMatrix.mat3;
@@ -37,15 +42,16 @@ class EarthRenderer {
 
         this.sphereData = null;
 
-        this.init();
         this.setupEventListeners();
+        // Don't call init() in constructor - main.js will call it async
     }
 
-    init() {
+    async init() {
         this.initGL();
         this.initShaders();
         this.initGeometry();
-        this.initTextures();
+        this.initProceduralTextures(); // Create fallback textures first
+        await this.initTextures(); // Load NASA textures async
         this.initMatrices();
 
         this.gl.enable(this.gl.DEPTH_TEST);
@@ -229,10 +235,47 @@ class EarthRenderer {
         this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), this.gl.STATIC_DRAW);
     }
 
-    initTextures() {
+    initProceduralTextures() {
         this.dayTexture = this.createProceduralTexture(this.generateDayTexture.bind(this));
         this.nightTexture = this.createProceduralTexture(this.generateNightTexture.bind(this));
         this.cloudTexture = this.createProceduralTexture(this.generateCloudTexture.bind(this));
+    }
+
+    async initTextures() {
+        try {
+            this.updateLoadingProgress('day', 0);
+            this.updateLoadingProgress('night', 0);
+            this.updateLoadingProgress('clouds', 0);
+
+            // Load NASA textures in parallel
+            const promises = [
+                this.loadImageTexture('textures/earth-day.jpg', 'day'),
+                this.loadImageTexture('textures/earth-night.jpg', 'night'),
+                this.loadImageTexture('textures/earth-clouds.jpg', 'clouds')
+            ];
+
+            const [dayTexture, nightTexture, cloudTexture] = await Promise.all(promises);
+
+            // Replace procedural textures with NASA textures
+            if (dayTexture) {
+                this.gl.deleteTexture(this.dayTexture);
+                this.dayTexture = dayTexture;
+            }
+            if (nightTexture) {
+                this.gl.deleteTexture(this.nightTexture);
+                this.nightTexture = nightTexture;
+            }
+            if (cloudTexture) {
+                this.gl.deleteTexture(this.cloudTexture);
+                this.cloudTexture = cloudTexture;
+            }
+
+            this.texturesLoaded = true;
+            console.log('NASA Earth textures loaded successfully');
+        } catch (error) {
+            console.warn('Failed to load NASA textures, using procedural fallback:', error);
+            this.useProceduralFallback = true;
+        }
     }
 
     createProceduralTexture(generator) {
@@ -248,6 +291,64 @@ class EarthRenderer {
         this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
 
         return texture;
+    }
+
+    async loadImageTexture(url, type) {
+        return new Promise((resolve, reject) => {
+            const image = new Image();
+            image.crossOrigin = 'anonymous';
+
+            image.onload = () => {
+                try {
+                    const texture = this.gl.createTexture();
+                    this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
+
+                    // Upload the image to WebGL
+                    this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGB, this.gl.RGB, this.gl.UNSIGNED_BYTE, image);
+
+                    // Set texture parameters for proper mapping
+                    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+                    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+                    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+                    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+
+                    this.updateLoadingProgress(type, 100);
+                    console.log(`${type} texture loaded: ${image.width}x${image.height}`);
+                    resolve(texture);
+                } catch (error) {
+                    console.error(`Failed to create ${type} texture:`, error);
+                    reject(error);
+                }
+            };
+
+            image.onerror = () => {
+                console.error(`Failed to load ${type} texture from ${url}`);
+                reject(new Error(`Failed to load ${type} texture`));
+            };
+
+            image.onprogress = (event) => {
+                if (event.lengthComputable) {
+                    const progress = (event.loaded / event.total) * 100;
+                    this.updateLoadingProgress(type, progress);
+                }
+            };
+
+            image.src = url;
+        });
+    }
+
+    updateLoadingProgress(type, progress) {
+        this.loadingProgress[type] = progress;
+
+        // Dispatch custom event for UI updates
+        const event = new CustomEvent('textureLoadProgress', {
+            detail: {
+                type,
+                progress,
+                totalProgress: (this.loadingProgress.day + this.loadingProgress.night + this.loadingProgress.clouds) / 3
+            }
+        });
+        window.dispatchEvent(event);
     }
 
     generateDayTexture(size) {

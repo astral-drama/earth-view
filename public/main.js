@@ -14,11 +14,13 @@ class EarthViewApp {
         this.init();
     }
 
-    init() {
+    async init() {
         this.setupCanvas();
-        this.setupRenderer();
+        this.setupLoadingIndicator();
+        await this.setupRenderer();
         this.setupControls();
         this.setupTimeDisplay();
+        this.hideLoadingIndicator();
         this.start();
 
         window.addEventListener('resize', () => this.handleResize());
@@ -32,9 +34,10 @@ class EarthViewApp {
         }
     }
 
-    setupRenderer() {
+    async setupRenderer() {
         try {
             this.renderer = new EarthRenderer(this.canvas);
+            await this.renderer.init();
         } catch (error) {
             this.showError('WebGL initialization failed: ' + error.message);
             throw error;
@@ -97,6 +100,113 @@ class EarthViewApp {
             });
 
             timeDisplay.textContent = `${timeString} - ${dateString}`;
+        }
+    }
+
+    setupLoadingIndicator() {
+        // Create loading overlay
+        this.loadingOverlay = document.createElement('div');
+        this.loadingOverlay.id = 'loading-overlay';
+        this.loadingOverlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            color: white;
+            font-family: Arial, sans-serif;
+        `;
+
+        // Loading text
+        this.loadingText = document.createElement('div');
+        this.loadingText.style.cssText = `
+            font-size: 24px;
+            margin-bottom: 20px;
+        `;
+        this.loadingText.textContent = 'Loading NASA Earth Textures...';
+
+        // Progress bars container
+        this.progressContainer = document.createElement('div');
+        this.progressContainer.style.cssText = `
+            width: 300px;
+        `;
+
+        // Create progress bars for each texture
+        this.progressBars = {};
+        ['day', 'night', 'clouds'].forEach(type => {
+            const container = document.createElement('div');
+            container.style.cssText = `
+                margin-bottom: 10px;
+            `;
+
+            const label = document.createElement('div');
+            label.style.cssText = `
+                font-size: 14px;
+                margin-bottom: 5px;
+                text-transform: capitalize;
+            `;
+            label.textContent = `${type} Texture: 0%`;
+
+            const progressBg = document.createElement('div');
+            progressBg.style.cssText = `
+                width: 100%;
+                height: 6px;
+                background: rgba(255, 255, 255, 0.2);
+                border-radius: 3px;
+                overflow: hidden;
+            `;
+
+            const progressBar = document.createElement('div');
+            progressBar.style.cssText = `
+                width: 0%;
+                height: 100%;
+                background: #4CAF50;
+                transition: width 0.3s ease;
+            `;
+
+            progressBg.appendChild(progressBar);
+            container.appendChild(label);
+            container.appendChild(progressBg);
+            this.progressContainer.appendChild(container);
+
+            this.progressBars[type] = { label, bar: progressBar };
+        });
+
+        this.loadingOverlay.appendChild(this.loadingText);
+        this.loadingOverlay.appendChild(this.progressContainer);
+        document.body.appendChild(this.loadingOverlay);
+
+        // Listen for texture loading progress
+        window.addEventListener('textureLoadProgress', (event) => {
+            this.updateProgress(event.detail);
+        });
+    }
+
+    updateProgress(detail) {
+        const { type, progress, totalProgress } = detail;
+
+        if (this.progressBars[type]) {
+            this.progressBars[type].label.textContent = `${type.charAt(0).toUpperCase() + type.slice(1)} Texture: ${Math.round(progress)}%`;
+            this.progressBars[type].bar.style.width = `${progress}%`;
+        }
+
+        // Update overall loading text
+        if (totalProgress === 100) {
+            this.loadingText.textContent = 'Textures loaded! Initializing Earth...';
+        } else {
+            this.loadingText.textContent = `Loading NASA Earth Textures... ${Math.round(totalProgress)}%`;
+        }
+    }
+
+    hideLoadingIndicator() {
+        if (this.loadingOverlay) {
+            this.loadingOverlay.style.display = 'none';
         }
     }
 
