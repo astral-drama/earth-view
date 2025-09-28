@@ -1,0 +1,24 @@
+{
+  "name": "earth-view",
+  "version": "1.0.0",
+  "description": "WebGL Earth simulator that visualizes time through realistic lighting",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "serve-node": "node server.js",
+    "dev": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "webgl",
+    "earth",
+    "time",
+    "visualization",
+    "lighting"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

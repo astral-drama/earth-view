@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Earth View - Time Visualization</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        #canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #time-display {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 32px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            z-index: 100;
+            background: rgba(0,0,0,0.3);
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 8px;
+            z-index: 100;
+        }
+
+        .control-group {
+            margin-bottom: 10px;
+        }
+
+        label {
+            display: inline-block;
+            width: 120px;
+            font-size: 14px;
+        }
+
+        input[type="range"] {
+            width: 150px;
+        }
+
+        input[type="checkbox"] {
+            margin-right: 5px;
+        }
+
+        #fps-counter {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: white;
+            font-size: 14px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 4px;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div id="time-display" data-testid="time-display">Loading...</div>
+
+    <div id="controls">
+        <div class="control-group">
+            <label for="rotation-speed">Rotation Speed:</label>
+            <input type="range" id="rotation-speed" min="0" max="2" step="0.1" value="0.5">
+        </div>
+        <div class="control-group">
+            <label for="zoom-level">Zoom Level:</label>
+            <input type="range" id="zoom-level" min="1.5" max="10" step="0.1" value="3">
+        </div>
+        <div class="control-group">
+            <label>
+                <input type="checkbox" id="atmosphere" checked> Atmosphere
+            </label>
+        </div>
+        <div class="control-group">
+            <label>
+                <input type="checkbox" id="clouds" checked> Clouds
+            </label>
+        </div>
+        <div class="control-group">
+            <label>
+                <input type="checkbox" id="night-lights" checked> Night Lights
+            </label>
+        </div>
+    </div>
+
+    <div id="fps-counter">FPS: --</div>
+
+    <canvas id="canvas"></canvas>
+
+    <script src="gl-matrix-min.js"></script>
+    <script src="earth-renderer.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>
