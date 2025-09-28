@@ -39,11 +39,13 @@ Implement the foundation WebGL Earth renderer with basic sphere geometry, proced
 - Procedural cloud texture (white clouds with alpha channel)
 - WebGL texture setup with appropriate filtering
 
-### Controls
+### Controls and UI
 - Mouse drag for rotation (X/Y axis rotation)
 - Mouse wheel for zoom (constrained between 1.5-10)
 - UI sliders for rotation speed and zoom level
 - Checkboxes for atmosphere, clouds, night lights
+- **Prominent time display in top center** showing current local time
+- Basic time display component (preparation for eavir-3 real-time updates)
 
 ## Implementation Notes
 - Use gl-matrix library for matrix operations
@@ -79,4 +81,3 @@ Implement the foundation WebGL Earth renderer with basic sphere geometry, proced
 - Load high-resolution NASA Earth texture maps
 - Implement realistic atmospheric scattering
 - Add real-time sun position calculations
-- Implement satellite tracking overlay

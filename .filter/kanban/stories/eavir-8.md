@@ -1,128 +1,190 @@
-# Story: eavir-8 - Tile Server Integration for High-Resolution Earth Imagery
+# Story: eavir-8 - Global Time Synchronization Analysis with Chrony
 
 ## Overview
-Replace static texture files with dynamic tile server integration to provide zoom-level appropriate imagery, real-time updates, and reduced initial load times using NASA GIBS as the primary source.
+Advanced analytics and reporting for global time synchronization networks using chrony's comprehensive logging and statistics, with anomaly detection and time quality assessment.
 
 ## Acceptance Criteria
-- [ ] Implement tile loading system with proper projection handling
-- [ ] NASA GIBS Blue Marble integration for base Earth imagery
-- [ ] Dynamic resolution switching based on zoom level
-- [ ] Tile caching system to minimize redundant requests
-- [ ] Smooth transition between tile zoom levels
-- [ ] Fallback to current static textures if tile server unavailable
-- [ ] Loading indicators for tile fetching
-- [ ] Proper tile attribution display
+- [ ] Parse and visualize chrony drift files and logs
+- [ ] Global time drift heatmap from chrony measurements
+- [ ] Network latency pattern analysis using chrony statistics
+- [ ] Time synchronization quality scoring based on chrony metrics
+- [ ] Anomaly detection from chrony tracking data
+- [ ] Historical trend analysis from chrony logs
+- [ ] Time zone boundary accuracy analysis
+- [ ] Leap second handling via chrony leap status
+- [ ] Regional time server performance comparison
 
 ## Technical Details
 
-### Tile System Architecture
-- Web Mercator (EPSG:3857) or Geographic (EPSG:4326) projection support
-- Quadtree tile pyramid (z/x/y structure)
-- Level-of-detail (LOD) management based on camera distance
-- Frustum culling to load only visible tiles
-- Progressive loading from low to high resolution
+### Chrony Data Collection
+```bash
+# Collect comprehensive statistics
+chronyc tracking      # System clock performance
+chronyc sourcestats -v # Per-source statistics
+chronyc activity      # Source activity summary
+chronyc smoothtime    # Clock adjustments
+chronyc rtcdata      # RTC drift information
 
-### NASA GIBS Integration
-- Base URL: `https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/`
-- Primary layer: `BlueMarble_NextGeneration`
-- Tile format: PNG or JPEG
-- Time dimension support for historical data
-- No API key required for public access
-
-### Tile Management
-- Request queue with priority based on distance from view center
-- Memory cache with LRU eviction policy
-- Optional IndexedDB persistence for offline capability
-- Tile request throttling to respect server limits
-- Error retry with exponential backoff
-
-## Enhancement Layers (Future Phases)
-
-### Night Lights Layer
-- Source: NASA Black Marble (VIIRS_Black_Marble)
-- Update frequency: Monthly composites
-- Use case: Identify population centers for time server correlation
-
-### Real-Time Weather
-- Source: MODIS_Terra_Clouds or GOES imagery
-- Update frequency: Every 10-30 minutes
-- Use case: Correlate network latency with weather patterns
-
-### Political Boundaries
-- Source: OpenStreetMap or Natural Earth
-- Format: Vector tiles for crisp rendering
-- Use case: Country/timezone boundary reference for time servers
-
-### Ocean and Terrain
-- Bathymetry: GEBCO tiles for ocean depth
-- Elevation: SRTM or ASTER GDEM for terrain
-- Use case: Submarine cable routes, mountain server stations
-
-## Implementation Considerations
-
-### Performance Optimization
-- Maximum concurrent tile requests: 6-8
-- Tile size: 256x256 or 512x512 pixels
-- Preload adjacent tiles during idle time
-- Use WebWorkers for tile processing
-- Implement progressive JPEG for faster initial display
-
-### Projection Handling
-- Sphere to tile coordinate transformation
-- Handle projection differences (Web Mercator vs Geographic)
-- Manage tile distortion at poles
-- Seamless wrapping at anti-meridian
-
-### Zoom Level Strategy
-```
-Zoom 0-3:  Full Earth, Blue Marble monthly composites
-Zoom 4-7:  Continental view, MODIS 8-day composites  
-Zoom 8-11: Regional view, MODIS daily imagery
-Zoom 12+:  Local view, Landsat or commercial imagery (if available)
+# Access historical data
+/var/log/chrony/*.log     # Measurements log
+/var/lib/chrony/drift     # Frequency drift file
+/var/lib/chrony/*.dat     # Source data files
 ```
 
-### Error Handling
-- Graceful degradation to lower zoom tiles
-- Fallback to static textures on tile server failure
-- User notification for persistent loading issues
-- Retry mechanism for temporary failures
+### Chrony Analytics Metrics
+- **System Performance**:
+  - Reference ID and stratum
+  - System time offset (current and RMS)
+  - Frequency offset (PPM)
+  - Residual frequency
+  - Skew (PPM)
+  - Root delay and dispersion
+  - Update interval
 
-## API Examples
+- **Per-Source Metrics**:
+  - Reachability patterns (377 = perfect)
+  - Sample statistics (mean, std dev)
+  - Estimated offset and error
+  - Frequency drift per source
+  - Polling intervals and adjustments
 
-### NASA GIBS WMTS URL Pattern
+### Analysis Components
+
+#### Time Quality Scoring Algorithm
+```javascript
+calculateQualityScore(chronyData) {
+  const weights = {
+    offset: 0.3,      // System time offset
+    frequency: 0.2,   // Frequency stability
+    skew: 0.2,        // Clock skew
+    sources: 0.15,    // Number of good sources
+    stratum: 0.15     // Stratum level
+  };
+
+  return {
+    score: weightedAverage(metrics, weights),
+    grade: getGrade(score), // A-F rating
+    issues: detectIssues(chronyData)
+  };
+}
 ```
-https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/
-  {Layer}/default/{Time}/{TileMatrixSet}/
-  {TileMatrix}/{TileRow}/{TileCol}.{Format}
 
-Example:
-https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/
-  BlueMarble_NextGeneration/default/2024-08-01/
-  EPSG4326_500m/4/5/10.jpg
+#### Anomaly Detection
+- **Chrony-Specific Patterns**:
+  - Sudden frequency jumps
+  - Source reachability drops
+  - Excessive clock corrections
+  - Stratum changes
+  - Leap second announcements
+
+- **Alert Triggers**:
+  - Offset > 1ms for stratum 1-2
+  - Frequency drift > 100 PPM
+  - Loss of all sources
+  - Clock stepped (not slewed)
+  - False ticker detection
+
+#### Global Heatmap Generation
+- Parse chrony logs from multiple locations
+- Geocode NTP server IPs
+- Calculate regional time quality metrics
+- Generate drift/offset heatmap overlay
+- Identify problematic regions
+
+### Historical Analysis
+```javascript
+{
+  timeRange: "24h",
+  samples: [
+    {
+      timestamp: "2024-01-15T12:00:00Z",
+      systemOffset: 0.000045,
+      frequency: -12.345,
+      skew: 0.123,
+      sources: {
+        good: 4,
+        total: 6,
+        stratumDistribution: [0, 2, 2, 0]
+      }
+    }
+  ],
+  trends: {
+    offsetTrend: "improving",
+    frequencyStability: 0.95,
+    sourceReliability: 0.98
+  }
+}
 ```
 
-### Alternative Free Tile Sources
-- **Sentinel Hub**: High-res European coverage (requires free account)
-- **USGS National Map**: US-specific high resolution
-- **OpenAerialMap**: Community-contributed drone/aerial imagery
-- **EOX Maps**: Cloudless Earth imagery mosaics
+### Reporting Features
+- **Automated Reports**:
+  - Daily time quality summary
+  - Weekly drift analysis
+  - Monthly server performance
+  - Leap second readiness
+
+- **Export Formats**:
+  - CSV for spreadsheet analysis
+  - JSON for API integration
+  - PDF reports with graphs
+  - Real-time dashboard API
+
+### Leap Second Handling
+```bash
+# Check leap second status
+chronyc leapstatus
+
+# Monitor for leap announcements
+chronyc sources -v | grep "Leap status"
+
+# Historical leap second events
+grep "Leap second" /var/log/chrony/*.log
+```
+
+## Implementation Phases
+
+### Phase 1: Data Collection
+- Set up chrony log parsing
+- Create data aggregation pipeline
+- Build historical data storage
+- Implement basic metrics calculation
+
+### Phase 2: Analytics Engine
+- Quality scoring algorithm
+- Anomaly detection system
+- Trend analysis calculations
+- Geographic clustering
+
+### Phase 3: Visualization & Reporting
+- Global heatmap overlay
+- Time quality dashboard
+- Automated report generation
+- Alert notification system
+
+## Data Sources
+- Chrony tracking and sourcestats
+- Chrony measurement logs
+- Drift and data files
+- System logs with time events
+- Geographic IP databases
+- Leap second announcement feeds
 
 ## Testing Requirements
-- Verify correct tile alignment at all zoom levels
-- Test offline fallback behavior
-- Validate tile cache eviction
-- Performance testing with rapid zoom/pan
-- Network failure simulation
-- Cross-browser tile rendering compatibility
+- Simulate various time quality scenarios
+- Test with degraded network conditions
+- Verify anomaly detection accuracy
+- Validate scoring algorithm
+- Performance with large log files
 
 ## Dependencies
-- Requires completed eavir-1 through eavir-4 foundation
-- May need CORS proxy for some tile providers
-- Consider CDN for tile caching in production
+- Requires eavir-5 (Chrony Time Server) completed
+- Requires eavir-7 (Advanced NTP Analytics) for complete analysis
+- Chrony logging enabled with measurements
+- Sufficient log retention (30+ days)
 
 ## Future Enhancements
-- Time slider for historical imagery playback
-- Custom tile server support for private deployments
-- Vector tile overlay support for crisp labels
-- 3D terrain with elevation tiles
-- Multi-spectral imagery for analysis (NDVI, thermal)
+- Machine learning for predictive analysis
+- Correlation with network events
+- Integration with monitoring systems (Prometheus, Grafana)
+- Time quality SLA monitoring
+- Blockchain timestamp verification
