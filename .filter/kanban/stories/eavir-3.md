@@ -7,6 +7,8 @@ Implement accurate sun position calculation and Earth lighting to visually repre
 - [ ] Calculate sun position based on current date/time for accurate lighting
 - [ ] Implement realistic directional lighting that shows time of day globally
 - [ ] Create smooth day/night terminator line that moves with real time
+- [ ] **Earth rotates at real-time rate** - lit portion accurately represents current global lighting second by second
+- [ ] **User rotation controls VIEW only** - mouse/touch rotation changes camera perspective but NOT what portion of Earth is lit
 - [ ] Add prominent time display in top center of UI showing current local time
 - [ ] Show realistic lighting gradients (dawn/dusk effects) that indicate time
 - [ ] Display seasonal lighting variations (solstices/equinoxes)
@@ -22,6 +24,23 @@ The core purpose is visual time representation:
 - Users should be able to determine approximate time by observing which regions are lit
 - Day/night boundary should move continuously with real time
 - Seasonal variations should be visible and accurate
+
+### Critical Implementation: Earth Rotation vs User Controls
+**Two separate rotation systems must be implemented:**
+
+#### 1. Real-Time Earth Rotation (Automatic)
+- Earth rotates 360° every 24 hours (15° per hour, 0.25° per minute)
+- Rotation is **independent** of user interaction
+- Sun position stays fixed relative to Earth's surface
+- Lit/unlit regions correspond to actual real-world day/night
+- Uses UTC time for calculation: `earthRotation = (utcHours * 15) + (utcMinutes * 0.25) + (utcSeconds * 0.00416)`
+
+#### 2. User View Rotation (Interactive)
+- Camera/view rotation controlled by mouse/touch
+- Does **NOT** affect which parts of Earth are lit
+- Simply changes the viewing angle of the user
+- Allows users to explore different continents while maintaining accurate lighting
+- Existing mouse controls continue to work but only affect camera position
 
 ### Time Display UI
 ```javascript

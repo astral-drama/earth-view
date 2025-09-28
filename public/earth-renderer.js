@@ -18,6 +18,12 @@ class EarthRenderer {
         this.loadingProgress = { day: 0, night: 0, clouds: 0 };
         this.useProceduralFallback = false;
 
+        // Real-time sun position and Earth rotation
+        this.realTimeMode = true;
+        this.currentDate = new Date();
+        this.earthRotation = 0; // Real-time Earth rotation (separate from user view)
+        this.userRotation = { x: 0, y: 0 }; // User camera rotation (separate from Earth)
+
         // Use glMatrix API
         this.mat4 = glMatrix.mat4;
         this.mat3 = glMatrix.mat3;
@@ -27,7 +33,6 @@ class EarthRenderer {
         this.viewMatrix = this.mat4.create();
         this.projectionMatrix = this.mat4.create();
 
-        this.rotation = { x: 0, y: 0 };
         this.zoom = 3.0;
         this.rotationSpeed = 0.5;
 
@@ -121,25 +126,46 @@ class EarthRenderer {
 
                 float sunDot = dot(normal, sunDir);
                 float dayFactor = max(0.0, sunDot);
-                float nightFactor = max(0.0, -sunDot * 0.8);
+                float nightFactor = max(0.0, -sunDot);
 
                 vec3 dayColor = texture2D(uDayTexture, vUV).rgb;
                 vec3 nightColor = texture2D(uNightTexture, vUV).rgb;
 
-                vec3 color = mix(nightColor * nightFactor * 0.3, dayColor, dayFactor);
+                // Create clear day/night separation with smooth terminator
+                vec3 color;
 
-                if (uShowNightLights) {
-                    color += nightColor * nightFactor * 0.8;
+                // Sharp day/night boundary
+                float threshold = 0.0;
+                if (sunDot > threshold) {
+                    // Daylight side - full day texture brightness
+                    float lightIntensity = smoothstep(0.0, 0.3, sunDot);
+                    color = dayColor * lightIntensity;
+                } else {
+                    // Night side - dark with city lights
+                    color = dayColor * 0.05; // Very dark base
+
+                    if (uShowNightLights) {
+                        float nightIntensity = smoothstep(0.0, -0.3, sunDot);
+                        color += nightColor * nightIntensity;
+                    }
                 }
 
                 if (uShowClouds) {
                     vec4 cloudColor = texture2D(uCloudTexture, vUV);
-                    color = mix(color, vec3(1.0), cloudColor.a * 0.7 * max(0.3, dayFactor));
+                    if (sunDot > 0.0) {
+                        // Bright clouds on day side
+                        color = mix(color, vec3(1.0), cloudColor.a * 0.7);
+                    } else {
+                        // Darker clouds on night side
+                        color = mix(color, vec3(0.3), cloudColor.a * 0.3);
+                    }
                 }
 
                 if (uShowAtmosphere) {
                     float atmosFactor = 1.0 - abs(dot(normal, normalize(vPosition)));
-                    color += vec3(0.3, 0.6, 1.0) * atmosFactor * atmosFactor * 0.3;
+                    if (sunDot > 0.0) {
+                        color += vec3(0.3, 0.6, 1.0) * atmosFactor * atmosFactor * 0.3;
+                    }
                 }
 
                 gl_FragColor = vec4(color, 1.0);
@@ -351,6 +377,38 @@ class EarthRenderer {
         window.dispatchEvent(event);
     }
 
+    calculateSunPosition(date = new Date()) {
+        // Use fixed sun position - sun stays at (1, 0, 0) pointing from +X direction
+        // Earth rotation will create the day/night cycle
+        // This is simpler and more intuitive than moving the sun
+        const sunDirection = [1, 0, 0]; // Fixed sun from positive X direction
+
+        return sunDirection;
+    }
+
+    calculateEarthRotation(date = new Date()) {
+        // Calculate real-time Earth rotation relative to fixed sun
+        const utcHours = date.getUTCHours();
+        const utcMinutes = date.getUTCMinutes();
+        const utcSeconds = date.getUTCSeconds();
+
+        // At 12:00 UTC, longitude 0° (Greenwich) should face the sun (+X direction)
+        // At other times, Earth should rotate so the correct longitude faces the sun
+        const timeInHours = utcHours + utcMinutes / 60 + utcSeconds / 3600;
+
+        // Calculate how much to rotate Earth so correct longitude faces sun
+        // At 12:00 UTC (noon), longitude 0° faces sun, so rotation = 0
+        // At 13:00 UTC, longitude 15°W should face sun, so rotate Earth +15°
+        // At 00:00 UTC, longitude 180° should face sun, so rotate Earth +180°
+        const sunLongitudeDeg = (timeInHours - 12) * 15;
+        const earthRotationDeg = sunLongitudeDeg + 180; // Add 180° to flip day/night sides
+
+        console.log(`Time: ${timeInHours.toFixed(2)}h UTC, Sun longitude: ${sunLongitudeDeg.toFixed(1)}°, Earth rotation: ${earthRotationDeg.toFixed(1)}°`);
+
+        // Convert to radians and return
+        return earthRotationDeg * Math.PI / 180;
+    }
+
     generateDayTexture(size) {
         const data = new Uint8Array(size * size * 4);
 
@@ -447,10 +505,10 @@ class EarthRenderer {
                 const deltaX = e.clientX - this.lastMousePos.x;
                 const deltaY = e.clientY - this.lastMousePos.y;
 
-                this.rotation.y += deltaX * 0.01;
-                this.rotation.x += deltaY * 0.01;
+                this.userRotation.y -= deltaX * 0.01;
+                this.userRotation.x -= deltaY * 0.01;
 
-                this.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.rotation.x));
+                this.userRotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.userRotation.x));
 
                 this.lastMousePos = { x: e.clientX, y: e.clientY };
             }
@@ -481,17 +539,37 @@ class EarthRenderer {
 
         this.gl.useProgram(this.program);
 
+        // Update current time for real-time calculations
+        if (this.realTimeMode) {
+            this.currentDate = new Date();
+        }
+
+        // Calculate real-time sun position (fixed in world space)
+        const sunDirection = this.calculateSunPosition(this.currentDate);
+
+        // Calculate real-time Earth rotation
+        this.earthRotation = this.calculateEarthRotation(this.currentDate);
+
+        // Set up Earth transformation matrix (Earth rotates relative to fixed sun)
         this.mat4.identity(this.modelMatrix);
-        this.mat4.rotateX(this.modelMatrix, this.modelMatrix, this.rotation.x);
-        this.mat4.rotateY(this.modelMatrix, this.modelMatrix, this.rotation.y + time * this.rotationSpeed * 0.001);
 
+        // Apply real-time Earth rotation (slow rotation relative to sun)
+        this.mat4.rotateY(this.modelMatrix, this.modelMatrix, this.earthRotation);
+
+        // Set up view matrix (camera rotates around Earth)
         this.mat4.identity(this.viewMatrix);
-        this.mat4.lookAt(this.viewMatrix, [0, 0, this.zoom], [0, 0, 0], [0, 1, 0]);
 
+        // Calculate camera position based on user rotation
+        const cameraDistance = this.zoom;
+        const cameraX = cameraDistance * Math.sin(this.userRotation.y) * Math.cos(this.userRotation.x);
+        const cameraY = cameraDistance * Math.sin(this.userRotation.x);
+        const cameraZ = cameraDistance * Math.cos(this.userRotation.y) * Math.cos(this.userRotation.x);
+
+        this.mat4.lookAt(this.viewMatrix, [cameraX, cameraY, cameraZ], [0, 0, 0], [0, 1, 0]);
+
+        // Calculate normal matrix for lighting
         const normalMatrix = this.mat3.create();
         this.mat3.normalFromMat4(normalMatrix, this.modelMatrix);
-
-        const sunDirection = [1.0, 0.5, 0.3];
 
         this.setUniforms(normalMatrix, sunDirection, time);
         this.bindAttributes();
