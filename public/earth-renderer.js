@@ -20,6 +20,7 @@ class EarthRenderer {
 
         // Real-time sun position and Earth rotation
         this.realTimeMode = true;
+        this.manualDate = null; // Override date when not in real-time mode
         this.currentDate = new Date();
         this.earthRotation = 0; // Real-time Earth rotation (separate from user view)
         this.userRotation = { x: 0, y: 0 }; // User camera rotation (separate from Earth)
@@ -39,7 +40,8 @@ class EarthRenderer {
         this.settings = {
             atmosphere: true,
             clouds: true,
-            nightLights: true
+            nightLights: true,
+            cloudOpacity: 0.7 // 0.0 to 1.0
         };
 
         this.isDragging = false;
@@ -112,6 +114,7 @@ class EarthRenderer {
             uniform bool uShowAtmosphere;
             uniform bool uShowClouds;
             uniform bool uShowNightLights;
+            uniform float uCloudOpacity;
 
             uniform vec3 uSunDirection;
             uniform float uTime;
@@ -125,47 +128,102 @@ class EarthRenderer {
                 vec3 sunDir = normalize(uSunDirection);
 
                 float sunDot = dot(normal, sunDir);
-                float dayFactor = max(0.0, sunDot);
-                float nightFactor = max(0.0, -sunDot);
 
                 vec3 dayColor = texture2D(uDayTexture, vUV).rgb;
                 vec3 nightColor = texture2D(uNightTexture, vUV).rgb;
 
-                // Create clear day/night separation with smooth terminator
+                // Realistic smooth lighting transitions - no hard boundaries
                 vec3 color;
 
-                // Sharp day/night boundary
-                float threshold = 0.0;
-                if (sunDot > threshold) {
-                    // Daylight side - full day texture brightness
-                    float lightIntensity = smoothstep(0.0, 0.3, sunDot);
-                    color = dayColor * lightIntensity;
-                } else {
-                    // Night side - dark with city lights
-                    color = dayColor * 0.05; // Very dark base
+                // Use continuous mathematical functions instead of branching
+                // This creates smooth, natural-looking transitions
 
-                    if (uShowNightLights) {
-                        float nightIntensity = smoothstep(0.0, -0.3, sunDot);
-                        color += nightColor * nightIntensity;
-                    }
+                // Enhanced terminator zone for realistic Earth-atmosphere effects
+                float terminatorWidth = 0.25; // Wider, more realistic transition zone
+
+                // Day lighting factor - smoothly transitions from 0 to 1
+                float dayFactor = smoothstep(-terminatorWidth, terminatorWidth, sunDot);
+
+                // Dawn/dusk warm lighting factor - peaks in terminator zone
+                float dawnDuskFactor = 1.0 - abs(sunDot / terminatorWidth);
+                dawnDuskFactor = clamp(dawnDuskFactor, 0.0, 1.0);
+                dawnDuskFactor = smoothstep(0.0, 1.0, dawnDuskFactor);
+
+                // Night lighting factor - inverse of day factor
+                float nightFactor = 1.0 - dayFactor;
+
+                // Base day lighting with realistic intensity curve
+                float dayIntensity = 0.1 + 0.9 * smoothstep(0.0, 0.6, sunDot);
+                vec3 dayLit = dayColor * dayIntensity;
+
+                // Add subtle warm tint to daylight areas
+                dayLit *= mix(vec3(1.0), vec3(1.05, 1.0, 0.95), dayFactor);
+
+                // Dawn/dusk warm lighting
+                vec3 dawnDuskTint = vec3(1.4, 0.9, 0.7); // Warm orange
+                vec3 dawnDuskLit = dayColor * 0.4 * dawnDuskTint;
+
+                // Night base lighting
+                vec3 nightLit = dayColor * 0.015; // Very dark base
+
+                // Add night lights if enabled
+                if (uShowNightLights) {
+                    float nightLightIntensity = smoothstep(0.2, -0.3, sunDot);
+                    nightLit += nightColor * nightLightIntensity * 1.5;
                 }
 
-                if (uShowClouds) {
+                // Smoothly blend all lighting components
+                color = nightLit * nightFactor +
+                        dayLit * dayFactor +
+                        dawnDuskLit * dawnDuskFactor * 0.6;
+
+                if (uShowClouds && uCloudOpacity > 0.0) {
                     vec4 cloudColor = texture2D(uCloudTexture, vUV);
-                    if (sunDot > 0.0) {
-                        // Bright clouds on day side
-                        color = mix(color, vec3(1.0), cloudColor.a * 0.7);
-                    } else {
-                        // Darker clouds on night side
-                        color = mix(color, vec3(0.3), cloudColor.a * 0.3);
-                    }
+                    float cloudAlpha = cloudColor.a * uCloudOpacity;
+
+                    // Smooth cloud lighting without hard boundaries
+                    // Day clouds - bright and white
+                    vec3 dayCloudColor = vec3(0.85, 0.9, 0.95) * (0.6 + 0.4 * clamp(sunDot, 0.0, 1.0));
+
+                    // Dawn/dusk clouds - warm orange/pink
+                    vec3 dawnDuskCloudColor = vec3(1.0, 0.7, 0.5) * 0.6;
+
+                    // Night clouds - dark blue/grey
+                    vec3 nightCloudColor = vec3(0.1, 0.12, 0.15);
+
+                    // Smoothly blend cloud colors using same factors as surface
+                    vec3 cloudLit = nightCloudColor * nightFactor +
+                                   dayCloudColor * dayFactor +
+                                   dawnDuskCloudColor * dawnDuskFactor;
+
+                    // Apply cloud shadows/highlights based on sun angle
+                    float cloudShadowing = 0.7 + 0.3 * clamp(sunDot, 0.0, 1.0);
+                    cloudLit *= cloudShadowing;
+
+                    color = mix(color, cloudLit, cloudAlpha * 0.75);
                 }
 
                 if (uShowAtmosphere) {
-                    float atmosFactor = 1.0 - abs(dot(normal, normalize(vPosition)));
-                    if (sunDot > 0.0) {
-                        color += vec3(0.3, 0.6, 1.0) * atmosFactor * atmosFactor * 0.3;
-                    }
+                    // Smooth atmospheric scattering without hard boundaries
+                    vec3 viewDir = normalize(vPosition);
+                    float fresnel = 1.0 - abs(dot(normal, viewDir));
+                    float atmosIntensity = fresnel * fresnel * 0.12; // Subtle atmosphere
+
+                    // Day atmosphere - blue sky
+                    vec3 dayAtmosphere = vec3(0.3, 0.6, 1.0);
+
+                    // Dawn/dusk atmosphere - warm orange/pink
+                    vec3 dawnDuskAtmosphere = vec3(1.0, 0.5, 0.3);
+
+                    // Night atmosphere - very subtle
+                    vec3 nightAtmosphere = vec3(0.05, 0.08, 0.15);
+
+                    // Smoothly blend atmospheric colors using same factors
+                    vec3 atmosphereColor = nightAtmosphere * nightFactor +
+                                          dayAtmosphere * dayFactor +
+                                          dawnDuskAtmosphere * dawnDuskFactor * 0.8;
+
+                    color += atmosphereColor * atmosIntensity;
                 }
 
                 gl_FragColor = vec4(color, 1.0);
@@ -378,10 +436,26 @@ class EarthRenderer {
     }
 
     calculateSunPosition(date = new Date()) {
-        // Use fixed sun position - sun stays at (1, 0, 0) pointing from +X direction
-        // Earth rotation will create the day/night cycle
-        // This is simpler and more intuitive than moving the sun
-        const sunDirection = [1, 0, 0]; // Fixed sun from positive X direction
+        // Calculate seasonal sun position with proper declination
+        // Sun direction includes both longitude (time) and latitude (season)
+
+        // Calculate day of year for seasonal declination
+        const startOfYear = new Date(date.getFullYear(), 0, 0);
+        const dayOfYear = Math.floor((date - startOfYear) / 86400000);
+
+        // Solar declination formula: declination = 23.45° × sin((360 × (284 + dayOfYear) / 365))
+        const declinationDeg = 23.45 * Math.sin((360 * (284 + dayOfYear) / 365) * Math.PI / 180);
+        const declinationRad = declinationDeg * Math.PI / 180;
+
+        // Calculate sun direction vector with seasonal declination
+        // Fixed sun direction incorporating seasonal variation
+        const sunDirection = [
+            Math.cos(declinationRad), // X: East-West (fixed)
+            Math.sin(declinationRad), // Y: North-South (seasonal)
+            0                         // Z: Depth (fixed)
+        ];
+
+        console.log(`Date: ${date.toDateString()}, Day of year: ${dayOfYear}, Solar declination: ${declinationDeg.toFixed(2)}°`);
 
         return sunDirection;
     }
@@ -539,15 +613,13 @@ class EarthRenderer {
 
         this.gl.useProgram(this.program);
 
-        // Update current time for real-time calculations
-        if (this.realTimeMode) {
-            this.currentDate = new Date();
-        }
+        // Get current date (real-time or manual)
+        this.currentDate = this.getCurrentDate();
 
-        // Calculate real-time sun position (fixed in world space)
+        // Calculate sun position (fixed in world space)
         const sunDirection = this.calculateSunPosition(this.currentDate);
 
-        // Calculate real-time Earth rotation
+        // Calculate Earth rotation
         this.earthRotation = this.calculateEarthRotation(this.currentDate);
 
         // Set up Earth transformation matrix (Earth rotates relative to fixed sun)
@@ -596,10 +668,12 @@ class EarthRenderer {
         const uShowAtmosphere = this.gl.getUniformLocation(this.program, 'uShowAtmosphere');
         const uShowClouds = this.gl.getUniformLocation(this.program, 'uShowClouds');
         const uShowNightLights = this.gl.getUniformLocation(this.program, 'uShowNightLights');
+        const uCloudOpacity = this.gl.getUniformLocation(this.program, 'uCloudOpacity');
 
         this.gl.uniform1i(uShowAtmosphere, this.settings.atmosphere);
         this.gl.uniform1i(uShowClouds, this.settings.clouds);
         this.gl.uniform1i(uShowNightLights, this.settings.nightLights);
+        this.gl.uniform1f(uCloudOpacity, this.settings.cloudOpacity);
     }
 
     bindAttributes() {
@@ -646,5 +720,33 @@ class EarthRenderer {
 
     updateRotationSpeed(speed) {
         this.rotationSpeed = speed;
+    }
+
+    // Time control methods
+    setTimeMode(realTime, manualDate = null) {
+        this.realTimeMode = realTime;
+        this.manualDate = manualDate;
+        console.log(`Time mode: ${realTime ? 'Real-time' : 'Manual'} ${manualDate ? `(${manualDate.toISOString()})` : ''}`);
+    }
+
+    getCurrentDate() {
+        return this.realTimeMode ? new Date() : (this.manualDate || new Date());
+    }
+
+    // Preset date methods
+    getSummerSolstice(year = new Date().getFullYear()) {
+        return new Date(year, 5, 21, 12, 0, 0); // June 21, noon UTC
+    }
+
+    getWinterSolstice(year = new Date().getFullYear()) {
+        return new Date(year, 11, 21, 12, 0, 0); // December 21, noon UTC
+    }
+
+    getSpringEquinox(year = new Date().getFullYear()) {
+        return new Date(year, 2, 20, 12, 0, 0); // March 20, noon UTC
+    }
+
+    getAutumnEquinox(year = new Date().getFullYear()) {
+        return new Date(year, 8, 22, 12, 0, 0); // September 22, noon UTC
     }
 }

@@ -50,6 +50,7 @@ class EarthViewApp {
         const atmosphere = document.getElementById('atmosphere');
         const clouds = document.getElementById('clouds');
         const nightLights = document.getElementById('night-lights');
+        const cloudOpacity = document.getElementById('cloud-opacity');
 
         if (rotationSpeed) {
             rotationSpeed.addEventListener('input', (e) => {
@@ -67,13 +68,129 @@ class EarthViewApp {
             this.renderer.updateSettings({
                 atmosphere: atmosphere ? atmosphere.checked : true,
                 clouds: clouds ? clouds.checked : true,
-                nightLights: nightLights ? nightLights.checked : true
+                nightLights: nightLights ? nightLights.checked : true,
+                cloudOpacity: cloudOpacity ? parseFloat(cloudOpacity.value) : 0.7
             });
         };
 
         if (atmosphere) atmosphere.addEventListener('change', updateSettings);
         if (clouds) clouds.addEventListener('change', updateSettings);
         if (nightLights) nightLights.addEventListener('change', updateSettings);
+        if (cloudOpacity) cloudOpacity.addEventListener('input', updateSettings);
+
+        // Setup time controls
+        this.setupTimeControls();
+
+        // Setup controls toggle
+        this.setupControlsToggle();
+    }
+
+    setupTimeControls() {
+        const realTimeMode = document.getElementById('real-time-mode');
+        const manualDateTime = document.getElementById('manual-datetime');
+        const summerSolstice = document.getElementById('summer-solstice');
+        const autumnEquinox = document.getElementById('autumn-equinox');
+        const winterSolstice = document.getElementById('winter-solstice');
+        const springEquinox = document.getElementById('spring-equinox');
+
+        // Real-time mode toggle
+        if (realTimeMode) {
+            realTimeMode.addEventListener('change', (e) => {
+                const isRealTime = e.target.checked;
+                if (manualDateTime) {
+                    manualDateTime.disabled = isRealTime;
+                    if (!isRealTime && !manualDateTime.value) {
+                        // Set current time as default when switching to manual
+                        const now = new Date();
+                        manualDateTime.value = now.toISOString().slice(0, 16);
+                    }
+                }
+                this.updateTimeMode();
+            });
+        }
+
+        // Manual date/time input
+        if (manualDateTime) {
+            manualDateTime.addEventListener('change', () => {
+                this.updateTimeMode();
+            });
+        }
+
+        // Preset buttons
+        if (summerSolstice) {
+            summerSolstice.addEventListener('click', () => {
+                this.setPresetDate(this.renderer.getSummerSolstice());
+            });
+        }
+
+        if (autumnEquinox) {
+            autumnEquinox.addEventListener('click', () => {
+                this.setPresetDate(this.renderer.getAutumnEquinox());
+            });
+        }
+
+        if (winterSolstice) {
+            winterSolstice.addEventListener('click', () => {
+                this.setPresetDate(this.renderer.getWinterSolstice());
+            });
+        }
+
+        if (springEquinox) {
+            springEquinox.addEventListener('click', () => {
+                this.setPresetDate(this.renderer.getSpringEquinox());
+            });
+        }
+    }
+
+    updateTimeMode() {
+        const realTimeMode = document.getElementById('real-time-mode');
+        const manualDateTime = document.getElementById('manual-datetime');
+
+        if (realTimeMode && manualDateTime) {
+            const isRealTime = realTimeMode.checked;
+
+            if (isRealTime) {
+                this.renderer.setTimeMode(true);
+            } else {
+                const manualDate = new Date(manualDateTime.value);
+                this.renderer.setTimeMode(false, manualDate);
+            }
+        }
+    }
+
+    setPresetDate(presetDate) {
+        const realTimeMode = document.getElementById('real-time-mode');
+        const manualDateTime = document.getElementById('manual-datetime');
+
+        if (realTimeMode && manualDateTime) {
+            // Switch to manual mode
+            realTimeMode.checked = false;
+            manualDateTime.disabled = false;
+
+            // Set the preset date
+            manualDateTime.value = presetDate.toISOString().slice(0, 16);
+
+            // Update the renderer
+            this.renderer.setTimeMode(false, presetDate);
+        }
+    }
+
+    setupControlsToggle() {
+        const controlsToggle = document.getElementById('controls-toggle');
+        const controls = document.getElementById('controls');
+
+        if (controlsToggle && controls) {
+            controlsToggle.addEventListener('click', () => {
+                controls.classList.toggle('controls-hidden');
+
+                // Update toggle button icon
+                if (controls.classList.contains('controls-hidden')) {
+                    controlsToggle.textContent = '⚙️';
+                } else {
+                    controlsToggle.textContent = '✕';
+                }
+            });
+        }
     }
 
     setupTimeDisplay() {
