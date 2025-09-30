@@ -200,23 +200,28 @@ class EarthViewApp {
 
     updateTimeDisplay() {
         const timeDisplay = document.getElementById('time-display');
+        const dateDisplay = document.getElementById('date-display');
+
+        const now = new Date();
+
         if (timeDisplay) {
-            const now = new Date();
             const timeString = now.toLocaleTimeString('en-US', {
                 hour12: false,
                 hour: '2-digit',
                 minute: '2-digit',
                 second: '2-digit'
             });
+            timeDisplay.textContent = timeString;
+        }
 
+        if (dateDisplay) {
             const dateString = now.toLocaleDateString('en-US', {
                 weekday: 'short',
                 year: 'numeric',
                 month: 'short',
                 day: 'numeric'
             });
-
-            timeDisplay.textContent = `${timeString} - ${dateString}`;
+            dateDisplay.textContent = dateString;
         }
     }
 
