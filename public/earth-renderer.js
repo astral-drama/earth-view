@@ -34,7 +34,8 @@ class EarthRenderer {
         this.viewMatrix = this.mat4.create();
         this.projectionMatrix = this.mat4.create();
 
-        this.zoom = 3.0;
+        this.zoom = 3.0; // Will be recalculated based on viewport
+        this.defaultZoom = 3.0; // Base zoom level
         this.rotationSpeed = 0.5;
 
         this.settings = {
@@ -384,11 +385,34 @@ class EarthRenderer {
 
             image.onload = () => {
                 try {
+                    // Check if image exceeds max texture size
+                    const maxSize = this.gl.getParameter(this.gl.MAX_TEXTURE_SIZE);
+                    let finalImage = image;
+
+                    if (image.width > maxSize || image.height > maxSize) {
+                        console.warn(`${type} texture (${image.width}x${image.height}) exceeds max size ${maxSize}, resizing...`);
+
+                        // Create a canvas to resize the image
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+
+                        // Calculate new dimensions maintaining aspect ratio
+                        const scale = Math.min(maxSize / image.width, maxSize / image.height);
+                        canvas.width = Math.floor(image.width * scale);
+                        canvas.height = Math.floor(image.height * scale);
+
+                        // Draw resized image
+                        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+                        finalImage = canvas;
+
+                        console.log(`${type} texture resized to ${canvas.width}x${canvas.height}`);
+                    }
+
                     const texture = this.gl.createTexture();
                     this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
 
                     // Upload the image to WebGL
-                    this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGB, this.gl.RGB, this.gl.UNSIGNED_BYTE, image);
+                    this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGB, this.gl.RGB, this.gl.UNSIGNED_BYTE, finalImage);
 
                     // Set texture parameters for proper mapping
                     this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
@@ -397,7 +421,7 @@ class EarthRenderer {
                     this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
 
                     this.updateLoadingProgress(type, 100);
-                    console.log(`${type} texture loaded: ${image.width}x${image.height}`);
+                    console.log(`${type} texture loaded: ${finalImage.width || finalImage.width}x${finalImage.height || finalImage.height}`);
                     resolve(texture);
                 } catch (error) {
                     console.error(`Failed to create ${type} texture:`, error);
@@ -558,9 +582,44 @@ class EarthRenderer {
         return n - Math.floor(n);
     }
 
+    calculateOptimalZoom() {
+        // Calculate the optimal zoom distance so the Earth fits in the viewport
+        // The Earth has radius 1.0 in our coordinate system
+        // We want to fit it with some padding
+
+        const fov = Math.PI / 4; // 45 degrees field of view
+        const aspect = this.canvas.width / this.canvas.height;
+
+        // Calculate the minimum distance needed to fit the sphere
+        // For a sphere of radius 1, we want to see a bit more (1.2x for padding)
+        const sphereRadius = 1.2;
+
+        // Use the smaller dimension to ensure Earth fits in both width and height
+        // Calculate based on vertical FOV for height-constrained viewports
+        // and horizontal FOV for width-constrained viewports
+        let requiredDistance;
+
+        if (aspect < 1) {
+            // Portrait mode - width is limiting factor
+            // Calculate horizontal FOV from vertical FOV and aspect
+            const hFov = 2 * Math.atan(Math.tan(fov / 2) * aspect);
+            requiredDistance = sphereRadius / Math.tan(hFov / 2);
+        } else {
+            // Landscape mode - height is limiting factor
+            requiredDistance = sphereRadius / Math.tan(fov / 2);
+        }
+
+        // Add a bit more distance for comfortable viewing
+        return requiredDistance * 1.1;
+    }
+
     initMatrices() {
         this.mat4.identity(this.modelMatrix);
         this.mat4.identity(this.viewMatrix);
+
+        // Calculate optimal zoom for current viewport
+        this.zoom = this.calculateOptimalZoom();
+        this.defaultZoom = this.zoom;
 
         this.mat4.lookAt(this.viewMatrix, [0, 0, this.zoom], [0, 0, 0], [0, 1, 0]);
 
@@ -595,7 +654,10 @@ class EarthRenderer {
         this.canvas.addEventListener('wheel', (e) => {
             e.preventDefault();
             this.zoom += e.deltaY * 0.01;
-            this.zoom = Math.max(1.5, Math.min(10, this.zoom));
+            // Allow zoom between 50% and 300% of optimal distance
+            const minZoom = this.defaultZoom * 0.5;
+            const maxZoom = this.defaultZoom * 3.0;
+            this.zoom = Math.max(minZoom, Math.min(maxZoom, this.zoom));
         });
     }
 
@@ -603,6 +665,14 @@ class EarthRenderer {
         this.canvas.width = this.canvas.clientWidth;
         this.canvas.height = this.canvas.clientHeight;
         this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+
+        // Recalculate optimal zoom for new viewport size
+        const newOptimalZoom = this.calculateOptimalZoom();
+
+        // Scale current zoom proportionally to maintain relative zoom level
+        const zoomRatio = this.zoom / this.defaultZoom;
+        this.defaultZoom = newOptimalZoom;
+        this.zoom = newOptimalZoom * zoomRatio;
 
         const aspect = this.canvas.width / this.canvas.height;
         this.mat4.perspective(this.projectionMatrix, Math.PI / 4, aspect, 0.1, 100.0);
